@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Website Domain Manager - Details</title>
+    <style>
+      :root {
+        --primary-color: #2563eb;
+        --bg-color: #f8fafc;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --card-bg: #ffffff;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        line-height: 1.6;
+        margin: 0;
+        padding: 40px 20px;
+      }
+
+      .container {
+        max-width: 860px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-size: 1.75rem;
+        margin-bottom: 0.5rem;
+        color: var(--primary-color);
+        text-align: center;
+      }
+
+      h2 {
+        font-size: 1.125rem;
+        margin: 1rem 0 1rem 0;
+        color: var(--text-main);
+        border-bottom: 1px solid #e6eefb;
+        padding-bottom: 8px;
+      }
+
+      .details-card {
+        background: var(--card-bg);
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 8px rgba(16, 24, 40, 0.06);
+      }
+
+      .details-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px 24px;
+        align-items: start;
+      }
+
+      .field {
+        display: flex;
+        flex-direction: column;
+        padding: 8px 0;
+      }
+
+      .field-label {
+        color: var(--text-muted);
+        font-size: 0.85rem;
+        margin-bottom: 6px;
+      }
+
+      .field-value {
+        font-weight: 600;
+        color: var(--text-main);
+        word-break: break-word;
+      }
+
+      .full-width {
+        grid-column: 1 / -1;
+      }
+
+      .btn-detail {
+        text-decoration: none;
+        background-color: var(--primary-color);
+        color: white;
+        padding: 8px 14px;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: background 0.15s;
+        display: inline-block;
+      }
+
+      .btn-detail:hover {
+        background-color: #1d4ed8;
+      }
+
+      .card-actions {
+        margin-top: 18px;
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+      }
+
+      @media (max-width: 640px) {
+        .details-grid {
+          grid-template-columns: 1fr;
+        }
+        body {
+          padding: 24px 12px;
+        }
+        h1 {
+          font-size: 1.5rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Website Domain Manager</h1>
+      <h2>Domain Details</h2>
+      <div role="status" aria-live="polite" style="background-color:#ecfdf5;color:#065f46;border:1px solid #bbf7d0;padding:10px 14px;border-radius:8px;margin-bottom:16px;font-weight:600;">
+         {{ success }}
+      </div>
+      {% if domain_info %}
+      <div class="details-card">
+        <div class="details-grid">
+          <div class="field">
+            <span class="field-label">Domain</span>
+            <span class="field-value">{{ domain_info.domain_name }}</span>
+          </div>
+
+          <div class="field">
+            <span class="field-label">IP Address</span>
+            <span class="field-value"
+              >{{ domain_info.ip_info.ip_address }}</span
+            >
+          </div>
+
+          <div class="field">
+            <span class="field-label">Server Location</span>
+            <span class="field-value">{{ domain_info.server_location }}</span>
+          </div>
+
+          <div class="field">
+            <span class="field-label">HTTP Status</span>
+            <span class="field-value">{{ domain_info.http_status_code }}</span>
+          </div>
+
+          <div class="field full-width">
+            <span class="field-label">SSL Issuer</span>
+            <span class="field-value">{{ domain_info.ssl_info.issuer }}</span>
+          </div>
+
+          <div class="field">
+            <span class="field-label">SSL Valid From</span>
+            <span class="field-value"
+              >{{ domain_info.ssl_info.valid_from }}</span
+            >
+          </div>
+
+          <div class="field">
+            <span class="field-label">SSL Valid To</span>
+            <span class="field-value">{{ domain_info.ssl_info.valid_to }}</span>
+          </div>
+
+          <div class="field full-width">
+            <span class="field-label">WHOIS Registrar</span>
+            <span class="field-value"
+              >{{ domain_info.whois_info.registrar }}</span
+            >
+          </div>
+
+          <div class="field">
+            <span class="field-label">WHOIS Created</span>
+            <span class="field-value"
+              >{{ domain_info.whois_info.creation_date }}</span
+            >
+          </div>
+
+          <div class="field">
+            <span class="field-label">WHOIS Expires</span>
+            <span class="field-value"
+              >{{ domain_info.whois_info.expiration_date }}</span
+            >
+          </div>
+
+          <div class="field full-width">
+            <span class="field-label">DNS Records</span>
+            <span class="field-value">A = {{ domain_info.dns_records.A }}</span>
+            <span class="field-value"
+              >CNAME = {{ domain_info.dns_records.CNAME }}</span
+            >
+            <span class="field-value"
+              >TXT = {{ domain_info.dns_records.TXT }}</span
+            >
+            <span class="field-value"
+              >MX = {{ domain_info.dns_records.MX }}</span
+            >
+            <span class="field-value"
+              >AAAA = {{ domain_info.dns_records.AAAA }}</span
+            >
+            <span class="field-value"
+              >ANY = {{ domain_info.dns_records.ANY }}</span
+            >
+          </div>
+        </div>
+
+        <div class="card-actions">
+          <a class="btn-detail" href="javascript:history.back()">Back</a>
+        </div>
+      </div>
+      {% else %}
+      <p>No domain information available.</p>
+      {% endif %}
+    </div>
+  </body>
+</html>

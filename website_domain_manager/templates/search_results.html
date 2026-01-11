@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Website Domain Manager - Search Results</title>
+    <style>
+      :root {
+        --primary-color: #2563eb;
+        --bg-color: #f8fafc;
+        --text-main: #1e293b;
+        --text-muted: #64748b;
+        --card-bg: #ffffff;
+      }
+
+      body {
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        background-color: var(--bg-color);
+        color: var(--text-main);
+        line-height: 1.6;
+        margin: 0;
+        padding: 40px 20px;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      h1 {
+        font-size: 2rem;
+        margin-bottom: 2rem;
+        color: var(--primary-color);
+        text-align: center;
+      }
+
+      h2 {
+        font-size: 1.25rem;
+        margin-bottom: 1rem;
+        border-bottom: 2px solid #e2e8f0;
+        padding-bottom: 10px;
+      }
+
+      ul {
+        list-style: none;
+        padding: 0;
+      }
+
+      li {
+        background: var(--card-bg);
+        margin-bottom: 12px;
+        padding: 16px 20px;
+        border-radius: 8px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        transition: transform 0.2s;
+      }
+
+      li:hover {
+        transform: translateY(-2px);
+      }
+
+      .domain-info {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .domain-name {
+        font-weight: bold;
+        font-size: 1.1rem;
+        color: var(--text-main);
+      }
+      .domain-link a {
+        text-decoration: none;
+        color: var(--primary-color);
+      }
+      .domain-link a:hover {
+        text-decoration: underline;
+      }
+      .ip-address {
+        color: var(--text-muted);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <h1>Website Domain Manager</h1>
+      <h2>Search Results</h2>
+
+      {% if results %}
+      <ul>
+        {% for domain in results %}
+        <li>
+          <div class="domain-info">
+            <span class="domain-name">{{ domain.domain_name }}</span>
+            <span class="ip-address">{{ domain.ip_info.ip_address }}</span>
+          </div>
+          <a
+            href="{% url 'website_domain_info_detail' domain.id %}"
+            class="btn-detail"
+            >View Details</a
+          >
+        </li>
+        {% endfor %}
+      </ul>
+      {% else %}
+      <p>No domains found matching your search.</p>
+      {% endif %}
+
+      <div class="card-actions" style="margin-top: 20px; text-align: center">
+        <a class="btn-detail" href="{% url 'index' %}">Back to Home</a>
+      </div>
+    </div>
+  </body>
+</html>
