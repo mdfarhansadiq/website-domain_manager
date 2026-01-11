@@ -28,7 +28,6 @@ def index(request):
 
 
 def is_valid_domain(domain: str) -> bool:
-
     return bool(DOMAIN_REGEX.fullmatch(domain))
 
 
@@ -153,20 +152,6 @@ def fetch_info(request):
             if not is_valid_domain(input_value) and not is_ip_address(input_value):
                 error = "Invalid domain name or IP address."
                 domains = WebsiteDomainInfo.objects.all()
-                unique_countries = set()
-
-                for d in WebsiteDomainInfo.objects.all():
-                    if d.server_location:
-                        try:
-                            location = ast.literal_eval(d.server_location)
-                            unique_countries.add(
-                                location.get("country")
-                                if location.get("country") != "None"
-                                else "Unknown"
-                            )
-                        except Exception:
-                            pass
-                countries = list(unique_countries)
 
                 print("ERROR:", error)
                 return render(
@@ -233,20 +218,13 @@ def fetch_info(request):
             else:
                 error = "Could not retrieve IP information. Invalid domain."
                 domains = WebsiteDomainInfo.objects.all()
-                unique_countries = set()
-
-                for d in WebsiteDomainInfo.objects.all():
-                    if d.server_location:
-                        try:
-                            location = ast.literal_eval(d.server_location)
-                            unique_countries.add(
-                                location.get("country")
-                                if location.get("country") != "None"
-                                else "Unknown"
-                            )
-                        except Exception:
-                            pass
-                countries = list(unique_countries)
+                countries = (
+                    WebsiteDomainInfo.objects.values_list(
+                        "server_location__country", flat=True
+                    )
+                    .exclude(server_location__country__isnull=True)
+                    .distinct()
+                )
 
                 print("ERROR:", error)
                 return render(
@@ -270,23 +248,13 @@ def fetch_info(request):
         )
     else:
         domains = WebsiteDomainInfo.objects.all()
+        countries = (
+            WebsiteDomainInfo.objects.values_list("server_location__country", flat=True)
+            .exclude(server_location__country__isnull=True)
+            .distinct()
+        )
         # Iterates through each object in the QuerySet and extracts the nested data
-        unique_countries = set()
-
-        for d in WebsiteDomainInfo.objects.all():
-            if d.server_location:
-                try:
-                    location = ast.literal_eval(d.server_location)
-                    unique_countries.add(
-                        location.get("country")
-                        if location.get("country") != "None"
-                        else "Unknown"
-                    )
-                except Exception:
-                    pass
-
-        countries = list(unique_countries)
-        # print("ALL DOMAINS:", domains)
+        print("ALL DOMAINS:", domains)
         return render(
             request,
             "index.html",
@@ -299,7 +267,34 @@ def fetch_info(request):
                 ).distinct(),
             },
         )
+    
+def edit_domain_info(request, domain_id):
+    domain_info = get_object_or_404(WebsiteDomainInfo, pk=domain_id)
+    error = None
+    success = None
 
+    if request.method == "POST":
+        # Example: Allow editing of the domain_name only
+        new_domain_name = request.POST.get("domain_name", "").strip().lower()
+
+        if is_valid_domain(new_domain_name):
+            domain_info.domain_name = new_domain_name
+            domain_info.save()
+            success = "Domain information updated successfully."
+            return redirect("index")
+        else:
+            error = "Invalid domain name."
+
+    return render(
+        request,
+        "edit_domain_info.html",
+        {"domain_info": domain_info, "error": error, "success": success},
+    )
+
+def delete_domain_info(request, domain_id):
+    domain_info = get_object_or_404(WebsiteDomainInfo, pk=domain_id)
+    domain_info.delete()
+    return redirect("index")
 
 def websit_domain_info_detail(request, domain_id):
     domain_info = get_object_or_404(WebsiteDomainInfo, pk=domain_id)
@@ -321,39 +316,18 @@ def search_data(request):
     return render(request, "search_results.html", {"results": results, "query": query})
 
 
+
+
 def apply_filters(request):
-    country = request.GET.get("country", "").strip().upper()
-    https_status_code = request.GET.get("https_status_code", "").strip()
-    all_results = WebsiteDomainInfo.objects.all()
     error = None
     results = []
-    if country and not https_status_code:
-        for result in all_results:
-            if result.server_location:
-                try:
-                    if country in result.server_location:
-                        print(result.server_location, result.domain_name)
-                        results.append(result)
-                except Exception:
-                    pass
+    country = request.GET.get("country", "").strip().upper()
+    https_status_code = request.GET.get("https_status_code", "").strip()
+    all_results = WebsiteDomainInfo.objects.filter(
+        server_location__country=country, http_status_code=https_status_code
+    )
 
-    if https_status_code and not country:
-        # Ensure results is a list so .append is valid in other branches
-        results = list(all_results.filter(http_status_code=https_status_code))
-
-    if country and https_status_code:
-        for result in all_results:
-            if result.server_location:
-                try:
-                    if (
-                        country in result.server_location
-                        and result.http_status_code == int(https_status_code)
-                    ):
-                        print(result.server_location, result.domain_name)
-                        results.append(result)
-                except Exception:
-                    pass
-                
+    results = list(all_results)
     if not results:
         error = "No results found for the selected country."
     return render(request, "filter_result.html", {"results": results, "error": error})
