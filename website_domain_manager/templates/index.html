@@ -248,6 +248,8 @@
           <div class="domain-info">
             <span class="domain-name">{{ domain.domain_name }}</span>
             <span class="ip-address">{{ domain.ip_info.ip_address }}</span>
+            <span class="server-location">{{ domain.server_location.country }} || {{ domain.server_location.region }}</span>
+            <span class="http-status">{{ domain.http_status_code }}</span>
           </div>
           <div>
             <a href="{% url 'edit_domain_info' domain.id %}" class="btn-detail"

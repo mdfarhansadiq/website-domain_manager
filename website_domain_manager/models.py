@@ -14,7 +14,7 @@ class WebsiteDomainInfo(models.Model):
   # Derived / summary fields (useful for filtering & queries)
   http_status_code = models.IntegerField(null=True, blank=True)
   is_available = models.BooleanField(default=False)
-  server_location = models.JSONField()
+  server_location = models.JSONField(null=True, blank=True)
 
   # Metadata
   # timestamp = models.DateTimeField()

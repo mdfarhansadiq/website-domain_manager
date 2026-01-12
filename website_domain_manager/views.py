@@ -60,6 +60,7 @@ def get_server_location(ip):
         }
     except Exception:
         print("Error fetching server location")
+        return {}
 
 
 def get_ssl_info(domain):
@@ -210,8 +211,7 @@ def fetch_info(request):
                     ip_info=ip_info,
                     http_status_code=http_info.get("status_code"),
                     is_available=http_info.get("available", False),
-                    # server_location=server_location,
-                    server_location=json.dumps(server_location),
+                    server_location=json_safe(server_location),
                 )
                 return redirect("website_domain_info_detail", domain_id=domain_info.id)
 
@@ -267,7 +267,8 @@ def fetch_info(request):
                 ).distinct(),
             },
         )
-    
+
+
 def edit_domain_info(request, domain_id):
     domain_info = get_object_or_404(WebsiteDomainInfo, pk=domain_id)
     error = None
@@ -291,10 +292,12 @@ def edit_domain_info(request, domain_id):
         {"domain_info": domain_info, "error": error, "success": success},
     )
 
+
 def delete_domain_info(request, domain_id):
     domain_info = get_object_or_404(WebsiteDomainInfo, pk=domain_id)
     domain_info.delete()
     return redirect("index")
+
 
 def websit_domain_info_detail(request, domain_id):
     domain_info = get_object_or_404(WebsiteDomainInfo, pk=domain_id)
@@ -314,8 +317,6 @@ def search_data(request):
         results = WebsiteDomainInfo.objects.filter(domain_name=query)
 
     return render(request, "search_results.html", {"results": results, "query": query})
-
-
 
 
 def apply_filters(request):
