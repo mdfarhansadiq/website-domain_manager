@@ -8,118 +8,15 @@ from django.shortcuts import (
     get_object_or_404,
 )
 from django.db.models import Q
-import dns.resolver
-import re
-import socket
-import ssl
-import datetime
 import requests
-import whois
+import website_domain_manager.helper_function as helper_function
 from .models import WebsiteDomainInfo
-
-# Regular expression to validate domain names
-DOMAIN_REGEX = re.compile(r"^(?!-)(?:[a-zA-Z0-9-]{1,63}\.)+[a-zA-Z]{2,63}$")
 
 
 # Create your views here.
 def index(request):
     domains = WebsiteDomainInfo.objects.all()
     return render(request, "index.html", {"domains": domains})
-
-
-def is_valid_domain(domain: str) -> bool:
-    return bool(DOMAIN_REGEX.fullmatch(domain))
-
-
-def get_whois_info(domain):
-    try:
-        w = whois.whois(domain)
-        return {
-            "registrar": w.registrar,
-            "creation_date": w.creation_date,
-            "expiration_date": w.expiration_date,
-        }
-    except Exception:
-        return {}
-
-
-def get_ip_info(domain):
-    try:
-        ip = socket.gethostbyname(domain)
-        return {"ip_address": ip}
-    except Exception:
-        return {}
-
-
-def get_server_location(ip):
-    try:
-        response = requests.get(f"https://ipinfo.io/{ip}/json").json()
-        return {
-            "country": response.get("country"),
-            "region": response.get("region"),
-        }
-    except Exception:
-        print("Error fetching server location")
-        return {}
-
-
-def get_ssl_info(domain):
-    try:
-        ctx = ssl.create_default_context()
-        with socket.create_connection((domain, 443), timeout=5) as sock:
-            with ctx.wrap_socket(sock, server_hostname=domain) as ssock:
-                cert = ssock.getpeercert()
-
-        return {
-            "issuer": dict(x[0] for x in cert.get("issuer", [])),
-            "valid_from": cert.get("notBefore"),
-            "valid_to": cert.get("notAfter"),
-        }
-    except Exception:
-        return {}
-
-
-def get_http_status(domain):
-    try:
-        response = requests.get(f"https://{domain}", timeout=5)
-        return {"status_code": response.status_code, "available": True}
-    except requests.RequestException:
-        return {"status_code": None, "available": False}
-
-
-def get_dns_records(domain):
-    resolver = dns.resolver.Resolver()
-    resolver.timeout = 5
-    resolver.lifetime = 4
-
-    records = {}
-
-    for t in ["A", "CNAME", "TXT"]:
-        try:
-            records[t] = [r.to_text() for r in resolver.resolve(domain, t)]
-        except Exception:
-            records[t] = []
-
-    return records
-
-
-def is_ip_address(value):
-    try:
-        socket.inet_aton(value)
-        return True
-    except socket.error:
-        return False
-
-
-def json_safe(data):
-    if isinstance(data, dict):
-        return {k: json_safe(v) for k, v in data.items()}
-    elif isinstance(data, list):
-        return [json_safe(item) for item in data]
-    elif isinstance(data, (datetime.date, datetime.datetime)):
-        return data.isoformat()  # Converts to "YYYY-MM-DD" or "YYYY-MM-DDTHH:MM:SS"
-    return data
-
 
 def fetch_info(request):
     domain_info = None
@@ -129,9 +26,10 @@ def fetch_info(request):
 
     if request.method == "POST":
         input_value = request.POST.get("domain_name", "").strip().lower()
+        domains = WebsiteDomainInfo.objects.all()
 
         # 2️⃣ Check if domain already exists (single query)
-        if is_ip_address(input_value):
+        if helper_function.is_ip_address(input_value):
             existing = WebsiteDomainInfo.objects.filter(
                 ip_info__ip_address=input_value
             ).first()
@@ -145,15 +43,33 @@ def fetch_info(request):
             return render(
                 request,
                 "website_domain_info_details.html",
-                {"domain_info": existing, "error": None, "success": success},
+                {
+                    "domain_info": existing,
+                    "error": None,
+                    "success": success,
+                    "https_status_codes": domains.values_list(
+                        "http_status_code", flat=True
+                    )
+                    .exclude(http_status_code__isnull=True)
+                    .exclude(http_status_code=None)
+                    .distinct()
+                    .order_by("http_status_code"),
+                },
             )
 
         try:
             # 1️⃣ Validate input
-            if not is_valid_domain(input_value) and not is_ip_address(input_value):
+            if not helper_function.is_valid_domain(input_value) and not helper_function.is_ip_address(input_value):
                 error = "Invalid domain name or IP address."
                 domains = WebsiteDomainInfo.objects.all()
-
+                countries = (
+                    WebsiteDomainInfo.objects.values_list(
+                        "server_location__country", flat=True
+                    )
+                    .exclude(server_location__country__isnull=True)
+                    .exclude(server_location__country=None)
+                    .distinct()
+                )
                 print("ERROR:", error)
                 return render(
                     request,
@@ -163,15 +79,22 @@ def fetch_info(request):
                         "error": error,
                         "domains": domains,
                         "countries": countries,
+                        "https_status_codes": domains.values_list(
+                            "http_status_code", flat=True
+                        )
+                        .exclude(http_status_code__isnull=True)
+                        .exclude(http_status_code=None)
+                        .distinct()
+                        .order_by("http_status_code"),
                     },
                 )
 
             # 3️⃣ Fetch all information concurrently
             # If it's an IP, we can't get WHOIS or DNS directly from it
-            if is_ip_address(input_value):
+            if helper_function.is_ip_address(input_value):
                 domain = input_value  # Treat IP as the domain for fetching
                 try:
-                    hostname, _, _ = socket.gethostbyaddr(input_value)
+                    hostname, _, _ = helper_function.socket.gethostbyaddr(input_value)
                     domain = hostname.rstrip(".")
                 except Exception:
                     domain = input_value
@@ -183,12 +106,11 @@ def fetch_info(request):
             else:
                 domain = input_value
             # Recursively clean all complex dictionary structures
-            whois_info = json_safe(get_whois_info(domain))
-            ip_info = json_safe(get_ip_info(domain))
-            dns_info = json_safe(get_dns_records(domain))
-            ssl_info = json_safe(get_ssl_info(domain))
-            http_info = json_safe(get_http_status(domain))
-
+            whois_info = helper_function.json_safe(helper_function.get_whois_info(domain))
+            ip_info = helper_function.json_safe(helper_function.get_ip_info(domain))
+            dns_info = helper_function.json_safe(helper_function.get_dns_records(domain))
+            ssl_info = helper_function.json_safe(helper_function.get_ssl_info(domain))
+            http_info = helper_function.json_safe(helper_function.get_http_status(domain))
             # Ensure ip_info and http_info are dicts before using .get()
             if not isinstance(ip_info, dict):
                 ip_info = {}
@@ -196,7 +118,7 @@ def fetch_info(request):
                 http_info = {}
 
             ip_address = ip_info.get("ip_address")
-            server_location = get_server_location(ip_address) if ip_address else {}
+            server_location = helper_function.get_server_location(ip_address) if ip_address else {}
 
             # 4️⃣ Save to Database
             if ip_info:
@@ -211,7 +133,7 @@ def fetch_info(request):
                     ip_info=ip_info,
                     http_status_code=http_info.get("status_code"),
                     is_available=http_info.get("available", False),
-                    server_location=json_safe(server_location),
+                    server_location=helper_function.json_safe(server_location),
                 )
                 return redirect("website_domain_info_detail", domain_id=domain_info.id)
 
@@ -223,6 +145,7 @@ def fetch_info(request):
                         "server_location__country", flat=True
                     )
                     .exclude(server_location__country__isnull=True)
+                    .exclude(server_location__country=None)
                     .distinct()
                 )
 
@@ -235,6 +158,13 @@ def fetch_info(request):
                         "error": error,
                         "domains": domains,
                         "countries": countries,
+                        "https_status_codes": domains.values_list(
+                            "http_status_code", flat=True
+                        )
+                        .exclude(http_status_code__isnull=True)
+                        .exclude(http_status_code=None)
+                        .distinct()
+                        .order_by("http_status_code"),
                     },
                 )
         except Exception as e:
@@ -251,6 +181,7 @@ def fetch_info(request):
         countries = (
             WebsiteDomainInfo.objects.values_list("server_location__country", flat=True)
             .exclude(server_location__country__isnull=True)
+            .exclude(server_location__country=None)
             .distinct()
         )
         # Iterates through each object in the QuerySet and extracts the nested data
@@ -262,9 +193,11 @@ def fetch_info(request):
                 "domains": domains,
                 "error": None,
                 "countries": countries,
-                "https_status_codes": domains.values_list(
-                    "http_status_code", flat=True
-                ).distinct(),
+                "https_status_codes": domains.values_list("http_status_code", flat=True)
+                .exclude(http_status_code__isnull=True)
+                .exclude(http_status_code=None)
+                .distinct()
+                .order_by("http_status_code"),
             },
         )
 
@@ -278,7 +211,7 @@ def edit_domain_info(request, domain_id):
         # Example: Allow editing of the domain_name only
         new_domain_name = request.POST.get("domain_name", "").strip().lower()
 
-        if is_valid_domain(new_domain_name):
+        if helper_function.is_valid_domain(new_domain_name):
             domain_info.domain_name = new_domain_name
             domain_info.save()
             success = "Domain information updated successfully."
